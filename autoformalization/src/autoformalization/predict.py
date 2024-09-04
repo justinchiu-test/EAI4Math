@@ -17,7 +17,16 @@ FORMALIZE_PROMPT = """Formalize the following statement in lean4.
 
 
 def formalize_prompt(statement):
-    pass
+    prompt = FORMALIZE_PROMPT.format(statement=statement)
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that formalizes mathematical statements in Lean4."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7,
+    )
+    return response.choices[0].message['content'].strip()
 
 
 def main():
