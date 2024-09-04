@@ -1,5 +1,5 @@
 import datasets
-import openai
+from openai import OpenAI
 import pdb
 import numpy as np
 
@@ -10,23 +10,55 @@ from autoformalization.constants import (
     LEAN_VAL_PATH,
     LEAN_TEST_PATH,
 )
+from autoformalization.viz.utils import (replacements, split_text_and_keep_equations)
 
+client = OpenAI()
+VISUALIZE = True
 
 FORMALIZE_PROMPT = """Formalize the following statement in lean4.
 {statement}"""
 
 
-def formalize_prompt(statement):
+def get_system_prompt(fewshot_examples):
+    examples = "\n\n".join([f"{x['input']}\n{x['output']}" for x in fewshot_examples])
+    return f"""
+You are a helpful assistant that formalizes mathematical statements in Lean4. You return only code that formalizes the statement. Do not try to prove the statement.
+
+Here are a few examples.
+
+# Examples
+{examples}
+""".strip()
+
+
+def formalize_prompt(system_prompt, statement):
     prompt = FORMALIZE_PROMPT.format(statement=statement)
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
+    response = client.chat.completions.create(
+        model="gpt-4o",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that formalizes mathematical statements in Lean4."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
         ],
-        temperature=0.7,
+        temperature=0,
     )
-    return response.choices[0].message['content'].strip()
+    return response.choices[0].message.content.strip()
+
+
+def get_predictions(system_prompt, data):
+    return [formalize_prompt(system_prompt, x["input"]) for x in data]
+
+def viz(statements, predictions, answers):
+    import streamlit as st
+    st.set_page_config(layout="wide")
+
+    idx = st.number_input("Prior example number", min_value=0, max_value=len(predictions)-1)
+
+    st.write(statements[idx])
+    col1, col2 = st.columns(2)
+    with col1:
+        st.code(predictions[idx])
+    with col2:
+        st.code(answers[idx])
 
 
 def main():
@@ -39,12 +71,18 @@ def main():
         },
     )
 
-    def predict(x):
-        x["prediction"] = formalize_prompt(x["input"])
-        return x
+    fewshot_data = lean["train"].select(list(range(10)))
+    val_data = lean["validation"].select(list(range(10)))
 
-    predictions = lean.map(predict)
-    predictions.save_to_disk("")
+    system_prompt = get_system_prompt(fewshot_data)
+    predictions = get_predictions(system_prompt, val_data)
+    answers = val_data["output"]
+
+    if VISUALIZE:
+        viz(val_data["input"], predictions, answers)
+
+    # lean.add_column("predictions", predictions)
+    # lean.save_to_disk("results/mathlib_predictions")
 
 
 if __name__ == "__main__":
