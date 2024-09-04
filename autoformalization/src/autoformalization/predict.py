@@ -1,4 +1,5 @@
 import datasets
+import json
 from openai import OpenAI
 import pdb
 import numpy as np
@@ -34,7 +35,7 @@ Here are a few examples.
 def formalize_prompt(system_prompt, statement):
     prompt = FORMALIZE_PROMPT.format(statement=statement)
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -62,6 +63,7 @@ def viz(statements, predictions, answers):
 
 
 def main():
+    """
     lean = datasets.load_dataset(
         "json",
         data_files={
@@ -70,16 +72,28 @@ def main():
             "test": LEAN_TEST_PATH,
         },
     )
+    """
 
-    fewshot_data = lean["train"].select(list(range(10)))
-    val_data = lean["validation"].select(list(range(10)))
+    with open("../data/lean_workbook.json") as f:
+        data = json.loads(f.read())
+    #fewshot_data = lean["train"].select(list(range(10)))
+    #val_data = lean["validation"].select(list(range(10)))
+
+    fewshot_data = [{
+        "input": x["natural_language_statement"],
+        "output": x["formal_statement"],
+    } for x in data[:10]]
+    val_data = [{
+        "input": x["natural_language_statement"],
+        "output": x["formal_statement"],
+    } for x in data[10:20]]
 
     system_prompt = get_system_prompt(fewshot_data)
     predictions = get_predictions(system_prompt, val_data)
-    answers = val_data["output"]
+    answers = [x["output"] for x in val_data]
 
     if VISUALIZE:
-        viz(val_data["input"], predictions, answers)
+        viz([x["input"] for x in val_data], predictions, answers)
 
     # lean.add_column("predictions", predictions)
     # lean.save_to_disk("results/mathlib_predictions")
