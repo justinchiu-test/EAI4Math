@@ -36,6 +36,7 @@ def formalize_prompt(system_prompt, statement):
     prompt = FORMALIZE_PROMPT.format(statement=statement)
     response = client.chat.completions.create(
         model="gpt-4o-mini",
+        #model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -82,11 +83,11 @@ def main():
     fewshot_data = [{
         "input": x["natural_language_statement"],
         "output": x["formal_statement"],
-    } for x in data[:10]]
+    } for x in data[0:10]]
     val_data = [{
         "input": x["natural_language_statement"],
         "output": x["formal_statement"],
-    } for x in data[10:20]]
+    } for x in data[56000:56010]]
 
     system_prompt = get_system_prompt(fewshot_data)
     predictions = get_predictions(system_prompt, val_data)
