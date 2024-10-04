@@ -1,4 +1,9 @@
 import requests
+from pathlib import Path
+
+def load_data(path):
+    with path.open("r")  as f:
+        return f.read()
 
 def submit_prompts(prompts):
     response = requests.post(
@@ -15,4 +20,6 @@ def submit_prompts(prompts):
 
 
 if __name__ == "__main__":
-    submit_prompts(["hi"])
+    data_path = Path("data/multiset.v")
+    prompt = load_data("data")
+    submit_prompts([prompt])
