@@ -13,7 +13,6 @@ def submit_prompts(prompts):
         },
     )
     if response.status_code == 200:
-        import pdb; pdb.set_trace()
         return response.json()
 
     import pdb; pdb.set_trace()
@@ -21,5 +20,5 @@ def submit_prompts(prompts):
 
 if __name__ == "__main__":
     data_path = Path("data/multiset.v")
-    prompt = load_data("data")
-    submit_prompts([prompt])
+    prompt = load_data(data_path)
+    output = submit_prompts([prompt])
