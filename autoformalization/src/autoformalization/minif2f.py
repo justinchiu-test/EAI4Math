@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
+@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
 async def query_prover(session: aiohttp.ClientSession, statements: List[str]) -> List[str]:
     url = 'https://justinchiu--deepseek-prover-web.modal.run'
     headers = {'Content-Type': 'application/json'}
@@ -19,7 +19,6 @@ async def query_prover(session: aiohttp.ClientSession, statements: List[str]) ->
         "prompts": statements,
         "settings": {},
     }
-    
     timeout = ClientTimeout(total=180)  # 3 minutes timeout
     try:
         async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
@@ -32,12 +31,11 @@ async def query_prover(session: aiohttp.ClientSession, statements: List[str]) ->
         logger.warning(f"Client error occurred: {e}. Retrying...")
         raise
 
-@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError)))
+@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError)))
 async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str]) -> List[Dict[str, Any]]:
     url = 'https://justinchiu--verifier-verify.modal.run/'
     headers = {'Content-Type': 'application/json'}
     data = [{"code": lean_code.replace("```","").strip()} for lean_code in lean_codes]
-    
     timeout = ClientTimeout(total=180)  # 3 minutes timeout
     try:
         async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
@@ -77,8 +75,9 @@ async def test_minif2f_lean4():
         ]
         results = await asyncio.gather(*[query_lean_server(session, [program]) for program in full_programs])
         print(f"Processed {len(results)} programs")
-        # You can add more processing here instead of using pdb
-        import pdb; pdb.set_trace()
+
+        with open("results.txt", "w") as f:
+            f.write(json.dumps(results))
 
 if __name__ == "__main__":
     asyncio.run(test_minif2f_lean4())
