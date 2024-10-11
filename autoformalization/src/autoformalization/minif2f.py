@@ -54,6 +54,7 @@ async def test_minif2f_lean4():
         results = await asyncio.gather(*[query_lean_server(session, [program]) for program in full_programs])
         print(f"Processed {len(results)} programs")
         # You can add more processing here instead of using pdb
+        import pdb; pdb.set_trace()
 
 if __name__ == "__main__":
     asyncio.run(test_minif2f_lean4())
