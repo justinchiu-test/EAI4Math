@@ -3,7 +3,7 @@ from datasets import load_dataset
 import aiohttp
 from typing import List, Dict, Any
 import json
-from aiohttp import ClientTimeout
+from aiohttp import ClientTimeout, ContentTypeError
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 import logging
 
@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
+@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
 async def query_prover(session: aiohttp.ClientSession, statements: List[str]) -> List[str]:
     url = 'https://justinchiu--deepseek-prover-web.modal.run'
     headers = {'Content-Type': 'application/json'}
@@ -22,6 +22,7 @@ async def query_prover(session: aiohttp.ClientSession, statements: List[str]) ->
     timeout = ClientTimeout(total=180)  # 3 minutes timeout
     try:
         async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
+            response.raise_for_status()
             results = await response.json()
         return results
     except asyncio.TimeoutError:
@@ -31,7 +32,7 @@ async def query_prover(session: aiohttp.ClientSession, statements: List[str]) ->
         logger.warning(f"Client error occurred: {e}. Retrying...")
         raise
 
-@retry(stop=stop_after_attempt(2), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError)))
+@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, ContentTypeError)))
 async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str]) -> List[Dict[str, Any]]:
     url = 'https://justinchiu--verifier-verify.modal.run/'
     headers = {'Content-Type': 'application/json'}
@@ -39,6 +40,16 @@ async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str
     timeout = ClientTimeout(total=180)  # 3 minutes timeout
     try:
         async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
+            response.raise_for_status()
+            content_type = response.headers.get('Content-Type', '')
+            if 'application/json' not in content_type:
+                logger.error(f"Unexpected content type: {content_type}")
+                raise ContentTypeError(
+                    response.request_info,
+                    response.history,
+                    message=f"Unexpected content type: {content_type}",
+                    headers=response.headers
+                )
             results = await response.json()
         return results
     except asyncio.TimeoutError:
@@ -49,6 +60,9 @@ async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str
         raise
     except json.JSONDecodeError:
         logger.error(f"Error decoding JSON. Response text: {await response.text()}")
+        raise
+    except ContentTypeError as e:
+        logger.error(f"Content type error: {e}")
         raise
 
 async def test_lean_server(session: aiohttp.ClientSession):
