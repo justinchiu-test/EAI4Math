@@ -3,8 +3,11 @@ from datasets import load_dataset
 import aiohttp
 from typing import List, Dict, Any
 import json
+from aiohttp import ClientTimeout
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 
+@retry(stop=stop_after_attempt(4), wait=wait_fixed(1))
 async def query_prover(session: aiohttp.ClientSession, statements: List[str]) -> List[str]:
     url = 'https://justinchiu--deepseek-prover-web.modal.run'
     headers = {'Content-Type': 'application/json'}
@@ -13,17 +16,20 @@ async def query_prover(session: aiohttp.ClientSession, statements: List[str]) ->
         "settings": {},
     }
     
-    async with session.post(url, headers=headers, json=data) as response:
+    timeout = ClientTimeout(total=180)  # 3 minutes timeout
+    async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
         results = await response.json()
     
     return results
 
+@retry(stop=stop_after_attempt(4), wait=wait_fixed(1))
 async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str]) -> List[Dict[str, Any]]:
     url = 'https://justinchiu--verifier-verify.modal.run/'
     headers = {'Content-Type': 'application/json'}
     data = [{"code": lean_code.replace("```","").strip()} for lean_code in lean_codes]
     
-    async with session.post(url, headers=headers, json=data) as response:
+    timeout = ClientTimeout(total=180)  # 3 minutes timeout
+    async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
         try:
             results = await response.json()
         except json.JSONDecodeError:
