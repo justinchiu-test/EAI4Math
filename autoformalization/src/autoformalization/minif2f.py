@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
+#@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
 async def query_prover(session: aiohttp.ClientSession, statements: List[str]) -> List[str]:
     url = 'https://justinchiu--deepseek-prover-web.modal.run'
     headers = {'Content-Type': 'application/json'}
@@ -27,12 +27,12 @@ async def query_prover(session: aiohttp.ClientSession, statements: List[str]) ->
         return results
     except asyncio.TimeoutError:
         logger.warning("Request to prover timed out. Retrying...")
-        raise
+        return [[""] for x in statements]
     except aiohttp.ClientError as e:
         logger.warning(f"Client error occurred: {e}. Retrying...")
-        raise
+        return [[""] for x in statements]
 
-@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, ContentTypeError)))
+#@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, ContentTypeError)))
 async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str]) -> List[Dict[str, Any]]:
     url = 'https://justinchiu--verifier-verify.modal.run/'
     headers = {'Content-Type': 'application/json'}
@@ -54,16 +54,16 @@ async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str
         return results
     except asyncio.TimeoutError:
         logger.warning("Request to Lean server timed out. Retrying...")
-        raise
+        return [{"complete": False} for x in lean_codes]
     except aiohttp.ClientError as e:
         logger.warning(f"Client error occurred: {e}. Retrying...")
-        raise
+        return [{"complete": False} for x in lean_codes]
     except json.JSONDecodeError:
         logger.error(f"Error decoding JSON. Response text: {await response.text()}")
-        raise
+        return [{"complete": False} for x in lean_codes]
     except ContentTypeError as e:
         logger.error(f"Content type error: {e}")
-        raise
+        return [{"complete": False} for x in lean_codes]
 
 async def test_lean_server(session: aiohttp.ClientSession):
     lean_codes = ["import Mathlib"]
