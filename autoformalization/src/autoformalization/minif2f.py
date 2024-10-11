@@ -42,11 +42,14 @@ async def test_minif2f_lean4():
         dataset = load_dataset("cat-searcher/minif2f-lean4")
         samples = dataset["test"]
         theorems_without_sorry = [
-            "Complete the following Lean 4 code:\n\n```lean4\n"
-            + sample["formal_statement"].replace(" sorry", "")
+            sample["formal_statement"].replace(" sorry", "")
             for sample in samples
         ]
-        generations = await query_prover(session, theorems_without_sorry)
+        prompts = [
+            "Complete the following Lean 4 code:\n\n```lean4\n" + theorem
+            for theorem in theorems_without_sorry
+        ]
+        generations = await query_prover(session, prompts)
         full_programs = [
             "import Mathlib\n" + theorem + generation[0]
             for theorem, generation in zip(theorems_without_sorry, generations)
