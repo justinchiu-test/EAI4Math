@@ -12,12 +12,16 @@ logger = logging.getLogger(__name__)
 
 
 #@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
-async def query_prover(session: aiohttp.ClientSession, statements: List[str]) -> List[str]:
+async def query_prover(
+    session: aiohttp.ClientSession,
+    statements: List[str],
+    n: int,
+) -> List[str]:
     url = 'https://justinchiu--deepseek-prover-web.modal.run'
     headers = {'Content-Type': 'application/json'}
     data = {
         "prompts": statements,
-        "settings": {},
+        "settings": {"n": n},
     }
     timeout = ClientTimeout(total=180)  # 3 minutes timeout
     try:
@@ -70,7 +74,7 @@ async def test_lean_server(session: aiohttp.ClientSession):
     results = await query_lean_server(session, lean_codes)
     print(results)
 
-async def test_minif2f_lean4():
+async def test_minif2f_lean4(n=128):
     async with aiohttp.ClientSession() as session:
         dataset = load_dataset("cat-searcher/minif2f-lean4")
         samples = dataset["test"]
@@ -92,6 +96,9 @@ async def test_minif2f_lean4():
 
         with open("results.txt", "w") as f:
             f.write(json.dumps(results))
+
+        import pdb; pdb.set_trace()
+        print(f"Pass@{n}:", sum([]))
 
 if __name__ == "__main__":
     asyncio.run(test_minif2f_lean4())
