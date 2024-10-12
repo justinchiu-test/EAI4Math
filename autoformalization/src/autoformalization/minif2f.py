@@ -122,8 +122,8 @@ async def test_minif2f_lean4(n=128):
         with open("results.txt", "w") as f:
             f.write(json.dumps(grouped_results))
 
-        import pdb; pdb.set_trace()
-        print(f"Pass@{n}:", sum([]))
+        passrate = sum([any([r[0]["complete"] for r in rs]) for rs in grouped_results]) / len(grouped_results)
+        print(f"Pass@{n}:", passrate)
 
 if __name__ == "__main__":
     asyncio.run(test_minif2f_lean4(n=128))
