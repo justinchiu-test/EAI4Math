@@ -86,11 +86,11 @@ async def test_minif2f_lean4(n=128):
             "Complete the following Lean 4 code:\n\n```lean4\n" + theorem
             for theorem in theorems_without_sorry
         ]
-        generations = await asyncio.gather(
+        all_generations = await asyncio.gather(
             *[query_prover(session, [prompt], n) for prompt in prompts]
         )
         # extra batching dim
-        generations = [x[0] for x in generations]
+        all_generations = [x[0] for x in all_generations]
 
         full_programs = [
             "import Mathlib\n" + theorem + generation
