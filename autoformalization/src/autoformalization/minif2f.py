@@ -105,6 +105,7 @@ async def test_minif2f_lean4(n=128):
             for generation in generations
         ]
 
+        semaphore = Semaphore(50)  # Limit concurrency to 50
         async def query_lean_with_semaphore(program):
             async with semaphore:
                 return await query_lean_server(session, [program])
