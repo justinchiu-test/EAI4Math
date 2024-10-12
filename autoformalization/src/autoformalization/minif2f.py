@@ -11,7 +11,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-#@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError)))
 async def query_prover(
     session: aiohttp.ClientSession,
     statements: List[str],
@@ -23,7 +22,7 @@ async def query_prover(
         "prompts": statements,
         "settings": {"n": n},
     }
-    timeout = ClientTimeout(total=180)  # 3 minutes timeout
+    timeout = ClientTimeout(total=None)  # 3 minutes timeout
     try:
         async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
             response.raise_for_status()
@@ -36,12 +35,12 @@ async def query_prover(
         logger.warning(f"Client error occurred: {e}. Retrying...")
         return [[""] for x in statements]
 
-#@retry(stop=stop_after_attempt(4), wait=wait_fixed(1), retry=retry_if_exception_type((asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, ContentTypeError)))
+
 async def query_lean_server(session: aiohttp.ClientSession, lean_codes: List[str]) -> List[Dict[str, Any]]:
     url = 'https://justinchiu--verifier-verify.modal.run/'
     headers = {'Content-Type': 'application/json'}
     data = [{"code": lean_code.replace("```","").strip()} for lean_code in lean_codes]
-    timeout = ClientTimeout(total=180)  # 3 minutes timeout
+    timeout = ClientTimeout(total=300)  # 3 minutes timeout
     try:
         async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
             response.raise_for_status()
@@ -74,6 +73,7 @@ async def test_lean_server(session: aiohttp.ClientSession):
     results = await query_lean_server(session, lean_codes)
     print(results)
 
+
 async def test_minif2f_lean4(n=128):
     async with aiohttp.ClientSession() as session:
         dataset = load_dataset("cat-searcher/minif2f-lean4")
@@ -86,7 +86,8 @@ async def test_minif2f_lean4(n=128):
             "Complete the following Lean 4 code:\n\n```lean4\n" + theorem
             for theorem in theorems_without_sorry
         ]
-        generations = await query_prover(session, prompts)
+        generations = await query_prover(session, prompts, n)
+        import pdb; pdb.set_trace()
         full_programs = [
             "import Mathlib\n" + theorem + generation[0]
             for theorem, generation in zip(theorems_without_sorry, generations)
@@ -101,4 +102,4 @@ async def test_minif2f_lean4(n=128):
         print(f"Pass@{n}:", sum([]))
 
 if __name__ == "__main__":
-    asyncio.run(test_minif2f_lean4())
+    asyncio.run(test_minif2f_lean4(n=128))
