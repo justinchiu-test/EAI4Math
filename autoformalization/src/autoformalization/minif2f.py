@@ -6,6 +6,7 @@ import json
 from aiohttp import ClientTimeout, ContentTypeError
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 import logging
+from asyncio import Semaphore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ async def test_lean_server(session: aiohttp.ClientSession):
 
 async def test_minif2f_lean4(n=128):
     async with aiohttp.ClientSession() as session:
+        semaphore = Semaphore(10)  # Limit concurrency to 10
         dataset = load_dataset("cat-searcher/minif2f-lean4")
         samples = dataset["test"]
         theorems_without_sorry = [
@@ -86,8 +88,13 @@ async def test_minif2f_lean4(n=128):
             "Complete the following Lean 4 code:\n\n```lean4\n" + theorem
             for theorem in theorems_without_sorry
         ]
+
+        async def query_with_semaphore(prompt):
+            async with semaphore:
+                return await query_prover(session, [prompt], n)
+
         all_generations = await asyncio.gather(
-            *[query_prover(session, [prompt], n) for prompt in prompts]
+            *[query_with_semaphore(prompt) for prompt in prompts]
         )
         # extra batching dim
         all_generations = [x[0] for x in all_generations]
@@ -97,12 +104,17 @@ async def test_minif2f_lean4(n=128):
             for theorem, generations in zip(theorems_without_sorry, all_generations)
             for generation in generations
         ]
-        results = await asyncio.gather(*[query_lean_server(session, [program]) for program in full_programs])
+
+        async def query_lean_with_semaphore(program):
+            async with semaphore:
+                return await query_lean_server(session, [program])
+
+        results = await asyncio.gather(*[query_lean_with_semaphore(program) for program in full_programs])
 
         grouped_results = []
         idx = 0
         for generations in all_generations:
-            grouped_results.append(results[idx:len(generations)])
+            grouped_results.append(results[idx:idx+len(generations)])
             idx += len(generations)
         print(f"Processed {len(results)} programs")
 
