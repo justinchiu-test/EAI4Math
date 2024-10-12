@@ -86,17 +86,28 @@ async def test_minif2f_lean4(n=128):
             "Complete the following Lean 4 code:\n\n```lean4\n" + theorem
             for theorem in theorems_without_sorry
         ]
-        generations = await query_prover(session, prompts, n)
-        import pdb; pdb.set_trace()
+        generations = await asyncio.gather(
+            *[query_prover(session, [prompt], n) for prompt in prompts]
+        )
+        # extra batching dim
+        generations = [x[0] for x in generations]
+
         full_programs = [
-            "import Mathlib\n" + theorem + generation[0]
-            for theorem, generation in zip(theorems_without_sorry, generations)
+            "import Mathlib\n" + theorem + generation
+            for theorem, generations in zip(theorems_without_sorry, all_generations)
+            for generation in generations
         ]
         results = await asyncio.gather(*[query_lean_server(session, [program]) for program in full_programs])
+
+        grouped_results = []
+        idx = 0
+        for generations in all_generations:
+            grouped_results.append(results[idx:len(generations)])
+            idx += len(generations)
         print(f"Processed {len(results)} programs")
 
         with open("results.txt", "w") as f:
-            f.write(json.dumps(results))
+            f.write(json.dumps(grouped_results))
 
         import pdb; pdb.set_trace()
         print(f"Pass@{n}:", sum([]))
